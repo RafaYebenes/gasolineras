@@ -1,0 +1,7 @@
+{
+  "name": "gasolineras",
+  "integrations": {
+    "capacitor": {}
+  },
+  "type": "angular"
+}
