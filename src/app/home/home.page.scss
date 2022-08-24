@@ -24,4 +24,12 @@
 
 #container a {
   text-decoration: none;
+  
+  position: static;
+}
+
+#mapId{
+  width: 100%;
+  height: max-content;
+  overflow: hidden;
 }
