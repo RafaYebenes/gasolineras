@@ -1,8 +1,9 @@
-import { Component } from '@angular/core';
+import { Component, HostListener } from '@angular/core';
 import { GasService } from '../services/gas.service';
 import { Geolocation } from '@capacitor/geolocation';
 import * as Leaflet from 'leaflet';
-import { CardComponent } from '../components/card/card.component';
+import { Platform } from '@ionic/angular';
+
 
 @Component({
   selector: 'app-home',
@@ -11,7 +12,13 @@ import { CardComponent } from '../components/card/card.component';
 })
 export class HomePage {
   map: Leaflet.Map;
-  constructor(private gas: GasService) {}
+  constructor(private gas: GasService, private platform: Platform) {
+
+    this.platform.backButton.subscribeWithPriority(10, () => {
+      console.log('Handler was called!');
+    });
+
+  }
   load = false;
 
   coords;
@@ -23,86 +30,77 @@ export class HomePage {
   mediumPrice = 0;
   rango1 = 0;
   rango2 = 0;
+  stationSelected;
+  gasMasBarata;
+  isModalOpen = false;
+
+  setOpen(isOpen: boolean) {
+    this.isModalOpen = isOpen;
+  }
 
   async ngOnInit() {
+
+    this.isModalOpen = false
+
     this.coords = await (await Geolocation.getCurrentPosition()).coords;
 
     this.leafletMap();
 
     this.gas.getGasData().subscribe((res: any) => {
-      this.gasList = res.ListaEESSPrecio.map((el, index) => {
-        if (index == 0) {
-          this.higherPrice = parseFloat(
-            el['Precio Gasoleo A'].replace(',', '.')
-          );
-          this.lowerPrice = parseFloat(
-            el['Precio Gasoleo A'].replace(',', '.')
-          );
-        }
-
-        if (
-          parseFloat(el['Precio Gasoleo A'].replace(',', '.')) >
-            this.higherPrice &&
-          el['Precio Gasoleo A']
-        )
-          this.higherPrice = parseFloat(
-            el['Precio Gasoleo A'].replace(',', '.')
-          );
-        if (
-          parseFloat(el['Precio Gasoleo A'].replace(',', '.')) <
-            this.lowerPrice &&
-          el['Precio Gasoleo A']
-        )
-          this.lowerPrice = parseFloat(
-            el['Precio Gasoleo A'].replace(',', '.')
-          );
-
-        return {
-          id: el.IDEESS,
-          name: el['Rótulo'],
-          provincia: el['Provincia'],
-          lat: parseFloat(el.Latitud.replace(',', '.')),
-          lng: parseFloat(el['Longitud (WGS84)'].replace(',', '.')),
-          horario: el.Horario,
-          biodiesel: el['Precio Biodiesel'],
-          bioEtanol: el['Precio Bioetanol'],
-          gasNaturalComp: el['Precio Gas Natural Comprimido'],
-          gasNaturalLiq: el['Precio Gas Natural Licuado'],
-          diesel: el['Precio Gasoleo A'],
-          gasB: el['Precio Gasoleo B'],
-          dieselPremium: el['Precio Gasoleo Premium'],
-          gaso95: el['Precio Gasolina 95 E5'],
-          gaso95Premium: el['Precio Gasolina 95 E5 Premium'],
-          gaso95E10: el['Precio Gasolina 95 E10'],
-          gaso98: el['Precio Gasolina 98 E5'],
-          gaso98E10: el['Precio Gasolina 98 E10'],
-          adBlue: el['Precio Hidrogeno'],
-          tipoVenta: el['Tipo Venta'],
-        };
-      });
-
-      console.log('higher price', this.higherPrice);
-      console.log('lowest price', this.lowerPrice);
-
-      this.mediumPrice = parseFloat(
-        ((this.higherPrice + this.lowerPrice) / 2).toFixed(5)
-      );
-      console.log('medium price', this.mediumPrice);
-
-      this.rango1 =
-        this.mediumPrice + (this.higherPrice - this.mediumPrice) / 2;
-
-      this.rango2 = this.lowerPrice + (this.mediumPrice - this.lowerPrice) / 2;
+      this.gasList = this.getGasStations(res);
 
       this.loadStations(this.coords.latitude, this.coords.longitude);
     });
+  }
+
+  getGasStations(list) {
+    return list.ListaEESSPrecio.map((el, index) => {
+      return {
+        id: el.IDEESS,
+        direccion: el['Dirección'],
+        name: el['Rótulo'],
+        provincia: el['Provincia'],
+        lat: parseFloat(el.Latitud.replace(',', '.')),
+        lng: parseFloat(el['Longitud (WGS84)'].replace(',', '.')),
+        horario: el.Horario,
+        biodiesel: el['Precio Biodiesel'],
+        bioEtanol: el['Precio Bioetanol'],
+        gasNaturalComp: el['Precio Gas Natural Comprimido'],
+        gasNaturalLiq: el['Precio Gas Natural Licuado'],
+        diesel: el['Precio Gasoleo A'],
+        gasB: el['Precio Gasoleo B'],
+        dieselPremium: el['Precio Gasoleo Premium'],
+        gaso95: el['Precio Gasolina 95 E5'],
+        gaso95Premium: el['Precio Gasolina 95 E5 Premium'],
+        gaso95E10: el['Precio Gasolina 95 E10'],
+        gaso98: el['Precio Gasolina 98 E5'],
+        gaso98E10: el['Precio Gasolina 98 E10'],
+        adBlue: el['Precio Hidrogeno'],
+        tipoVenta: el['Tipo Venta'],
+        link: "https://www.google.com/maps/dir/?api=1&destination="+parseFloat(el.Latitud.replace(',', '.')) + '/' + parseFloat(el['Longitud (WGS84)'].replace(',', '.'))
+      };
+    });
+  }
+
+  goBack(){
+    this.setOpen(false)
+  }
+
+  setPrices() {
+
+    this.mediumPrice = parseFloat(((this.higherPrice + this.lowerPrice) / 2).toFixed(5));
+
+    this.rango1 = this.mediumPrice + (this.higherPrice - this.mediumPrice) / 2;
+
+    this.rango2 = this.lowerPrice + (this.mediumPrice - this.lowerPrice) / 2;
+
   }
 
   leafletMap() {
     this.map = Leaflet.map('mapId', {
       center: [this.coords.latitude, this.coords.longitude],
       zoom: 12,
-      zoomControl: false
+      zoomControl: false,
     });
 
     Leaflet.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -152,11 +150,45 @@ export class HomePage {
     return dist;
   }
 
-  loadStations(lat1, lng1) {
-    let nearStation = [];
 
-    this.gasList.forEach((el) => {
-      if (this.getNearCoords(lat1, el.lat, lng1, el.lng, 'K') < 10) {
+  getNearStations(lat1, lng1){
+    
+    this.gasMasBarata = null
+    let nearStations = this.gasList.filter((el) => {
+      if (this.getNearCoords(lat1, el.lat, lng1, el.lng, 'K') < 5 && el.tipoVenta == 'P')  return el
+    })
+
+    nearStations.map((el, index) => {
+
+      if (index == 0) {
+        this.higherPrice = parseFloat(el.diesel.replace(',', '.') );
+        this.lowerPrice = parseFloat(el.diesel.replace(',', '.'));
+        this.gasMasBarata = el
+      }
+
+      if (  parseFloat(el.diesel.replace(',', '.')) > this.higherPrice && el.diesel )
+        this.higherPrice = parseFloat(el.diesel.replace(',', '.'));
+      
+      
+      if ( parseFloat(el.diesel.replace(',', '.')) < this.lowerPrice && el.diesel ){
+        this.lowerPrice = parseFloat(el.diesel.replace(',', '.'));
+        this.gasMasBarata = el
+      }
+
+    })
+
+    console.log('station cheaper', this.gasMasBarata)
+
+    this.setPrices();
+
+    return nearStations
+  }
+
+
+  loadStations(lat1, lng1) {
+
+    this.getNearStations(lat1, lng1).forEach((el, index) => {
+        
         let diesel = parseFloat(el.diesel.replace(',', '.'));
 
         var greenIcon = Leaflet.icon({
@@ -164,33 +196,53 @@ export class HomePage {
           iconSize: [50, 50], // size of the icon
         });
 
-        let mark = Leaflet.marker([el.lat, el.lng], { icon: greenIcon })
+
+        let mark = Leaflet.marker([el.lat, el.lng], {
+          icon: greenIcon,
+          title: index,
+        })
           .addTo(this.map)
-          .bindPopup(el.name);
+          .bindTooltip(el.diesel + '€', { permanent: true, direction: 'top' }).addEventListener('click', (station) => {
+            console.log('gas',el)
+            this.stationSelected = el
+            this.setOpen(true)
+          });
+
         this.markers.push(mark);
-      }
     });
   }
 
   getIcon(diesel) {
-    if (diesel > this.rango2 || diesel <= this.lowerPrice){
-      console.log('low');
-      return '../../assets/markers/pin-low.png';
-    }
-    if (diesel < this.rango1 || diesel < this.rango2){
-      console.log('med');
-      return '../../assets/markers/pin-medium.png';
-    }
-    if (diesel >= this.rango1 || diesel <= this.higherPrice){
-      console.log('high');
+    if (this.higherPrice >= diesel && diesel >= this.rango1) {
       return '../../assets/markers/pin-high.png';
     }
-    return '../../assets/markers/pin-low.png';
+
+    if (this.rango1 > diesel && diesel >= this.mediumPrice) {
+      return '../../assets/markers/pin-medium.png';
+    }
+
+    if (this.mediumPrice > diesel && diesel >= this.lowerPrice) {
+      return '../../assets/markers/pin-low.png';
+    }
+
+    return '../../assets/markers/pin-medium.png';
+  }
+
+
+  openModalCheaper(){
+    this.stationSelected = this.gasMasBarata
+    this.setOpen(true)
   }
 
   removeMarks() {
     this.markers.forEach((mark) => {
       this.map.removeLayer(mark);
     });
+  }
+
+  centerMap() {
+    this.removeMarks();
+    this.loadStations(this.coords.latitude, this.coords.longitude);
+    this.map.flyTo([this.coords.latitude, this.coords.longitude]);
   }
 }
