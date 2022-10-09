@@ -1,8 +1,8 @@
 {
   "name": "gasolineras",
   "version": "0.0.1",
-  "author": "Ionic Framework",
-  "homepage": "https://ionicframework.com/",
+  "author": "YebenesApps",
+  "homepage": "",
   "scripts": {
     "ng": "ng",
     "start": "ng serve",
@@ -20,6 +20,7 @@
     "@angular/platform-browser-dynamic": "^14.0.0",
     "@angular/router": "^14.0.0",
     "@asymmetrik/ngx-leaflet": "^14.0.1",
+    "@capacitor-community/admob": "^4.0.0-1",
     "@capacitor/android": "4.1.0",
     "@capacitor/app": "4.0.1",
     "@capacitor/core": "4.1.0",

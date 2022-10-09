@@ -1,7 +1,9 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">gasolineras</string>
-    <string name="title_activity_main">gasolineras</string>
-    <string name="package_name">io.ionic.starter</string>
-    <string name="custom_url_scheme">io.ionic.starter</string>
+    <string name="app_name">GasoliApp</string>
+    <string name="title_activity_main">GasoliApp</string>
+    <string name="package_name">yebenesapps.app.gasoliapp</string>
+    <string name="custom_url_scheme">yebenesapps.app.gasoliapp</string>
+    <string name="admob_app_id">ca-app-pub-7253910914294252~3529772895</string>
+
 </resources>

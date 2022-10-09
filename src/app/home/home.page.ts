@@ -2,25 +2,30 @@ import { Component, HostListener } from '@angular/core';
 import { GasService } from '../services/gas.service';
 import { Geolocation } from '@capacitor/geolocation';
 import * as Leaflet from 'leaflet';
-import { Platform } from '@ionic/angular';
+import { ToastController } from '@ionic/angular';
 
+import {
+  AdMob,
+  BannerAdOptions,
+  BannerAdPluginEvents,
+  BannerAdPosition,
+  BannerAdSize,
+} from '@capacitor-community/admob';
 
 @Component({
   selector: 'app-home',
   templateUrl: 'home.page.html',
   styleUrls: ['home.page.scss'],
+  providers: [GasService],
 })
 export class HomePage {
   map: Leaflet.Map;
-  constructor(private gas: GasService, private platform: Platform) {
-
-    this.platform.backButton.subscribeWithPriority(10, () => {
-      console.log('Handler was called!');
-    });
-
+  constructor(private gas: GasService,private toastController: ToastController) {
+    this.initialize()
   }
-  load = false;
 
+  load = false;
+  loading = true;
   coords;
   gasList;
   coordsChanged;
@@ -33,24 +38,46 @@ export class HomePage {
   stationSelected;
   gasMasBarata;
   isModalOpen = false;
+  showCheapers = false;
+  labelSegment = 'all';
+  showFilters = false;
+
+
 
   setOpen(isOpen: boolean) {
     this.isModalOpen = isOpen;
   }
 
+  async initialize(){
+    await AdMob.trackingAuthorizationStatus().then((res) => {
+      if(res.status == "authorized") this.showBanner().catch(res => {
+        this.showError('error on ad loading' + res)
+      })
+      else console.log('fallo al obtener la autorización')
+    });
+  }
+
   async ngOnInit() {
+   
 
-    this.isModalOpen = false
+    console.log('dateStart home', new Date());
 
-    this.coords = await (await Geolocation.getCurrentPosition()).coords;
-
-    this.leafletMap();
+    await Geolocation.getCurrentPosition().then((res) => {
+      this.coords = res.coords
+    }).catch((res) => {
+      this.showError('error getting coords' + res)
+    });
 
     this.gas.getGasData().subscribe((res: any) => {
       this.gasList = this.getGasStations(res);
-
       this.loadStations(this.coords.latitude, this.coords.longitude);
+      this.loading = false;
+      console.log('dateEnd home', new Date());
     });
+
+    this.isModalOpen = false;
+
+    this.leafletMap();
   }
 
   getGasStations(list) {
@@ -77,23 +104,27 @@ export class HomePage {
         gaso98E10: el['Precio Gasolina 98 E10'],
         adBlue: el['Precio Hidrogeno'],
         tipoVenta: el['Tipo Venta'],
-        link: "https://www.google.com/maps/dir/?api=1&destination="+parseFloat(el.Latitud.replace(',', '.')) + '/' + parseFloat(el['Longitud (WGS84)'].replace(',', '.'))
+        link:
+          'https://www.google.com/maps/dir/?api=1&destination=' +
+          parseFloat(el.Latitud.replace(',', '.')) +
+          '/' +
+          parseFloat(el['Longitud (WGS84)'].replace(',', '.')),
       };
     });
   }
 
-  goBack(){
-    this.setOpen(false)
+  goBack() {
+    this.setOpen(false);
   }
 
   setPrices() {
-
-    this.mediumPrice = parseFloat(((this.higherPrice + this.lowerPrice) / 2).toFixed(5));
+    this.mediumPrice = parseFloat(
+      ((this.higherPrice + this.lowerPrice) / 2).toFixed(5)
+    );
 
     this.rango1 = this.mediumPrice + (this.higherPrice - this.mediumPrice) / 2;
 
     this.rango2 = this.lowerPrice + (this.mediumPrice - this.lowerPrice) / 2;
-
   }
 
   leafletMap() {
@@ -101,7 +132,7 @@ export class HomePage {
       center: [this.coords.latitude, this.coords.longitude],
       zoom: 12,
       zoomControl: false,
-    });
+    })
 
     Leaflet.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: 'yebenesApps',
@@ -111,7 +142,7 @@ export class HomePage {
       setTimeout(() => {
         this.map.invalidateSize();
         this.load = true;
-      }, 1000);
+      }, 500);
     });
 
     this.map.on('dragend', (data) => {
@@ -120,10 +151,6 @@ export class HomePage {
       this.loadStations(this.coordsChanged.lat, this.coordsChanged.lng);
     });
 
-    /*gasList.forEach((station, index) => {
-      Leaflet.marker([parseFloat(station.Latitud), parseFloat(station['Longitud (WGS84)'])]).addTo(this.map).bindPopup(station['Rótulo']).openPopup();
-      if(index == 50) return;
-    });*/
   }
 
   getNearCoords(lat1, lat2, lon1, lon2, unit) {
@@ -150,65 +177,75 @@ export class HomePage {
     return dist;
   }
 
-
-  getNearStations(lat1, lng1){
-    
-    this.gasMasBarata = null
+  getNearStations(lat1, lng1) {
+    this.gasMasBarata = null;
     let nearStations = this.gasList.filter((el) => {
-      if (this.getNearCoords(lat1, el.lat, lng1, el.lng, 'K') < 5 && el.tipoVenta == 'P')  return el
-    })
+      if (
+        this.getNearCoords(lat1, el.lat, lng1, el.lng, 'K') < 5 &&
+        el.tipoVenta == 'P'
+      )
+        return el;
+    });
 
     nearStations.map((el, index) => {
-
       if (index == 0) {
-        this.higherPrice = parseFloat(el.diesel.replace(',', '.') );
-        this.lowerPrice = parseFloat(el.diesel.replace(',', '.'));
-        this.gasMasBarata = el
-      }
-
-      if (  parseFloat(el.diesel.replace(',', '.')) > this.higherPrice && el.diesel )
         this.higherPrice = parseFloat(el.diesel.replace(',', '.'));
-      
-      
-      if ( parseFloat(el.diesel.replace(',', '.')) < this.lowerPrice && el.diesel ){
         this.lowerPrice = parseFloat(el.diesel.replace(',', '.'));
-        this.gasMasBarata = el
+        this.gasMasBarata = el;
       }
 
-    })
+      if (
+        parseFloat(el.diesel.replace(',', '.')) > this.higherPrice &&
+        el.diesel
+      )
+        this.higherPrice = parseFloat(el.diesel.replace(',', '.'));
 
-    console.log('station cheaper', this.gasMasBarata)
+      if (
+        parseFloat(el.diesel.replace(',', '.')) < this.lowerPrice &&
+        el.diesel
+      ) {
+        this.lowerPrice = parseFloat(el.diesel.replace(',', '.'));
+        this.gasMasBarata = el;
+      }
+    });
 
     this.setPrices();
 
-    return nearStations
-  }
-
-
-  loadStations(lat1, lng1) {
-
-    this.getNearStations(lat1, lng1).forEach((el, index) => {
-        
+    if (this.showCheapers) {
+      nearStations = nearStations.filter((el) => {
         let diesel = parseFloat(el.diesel.replace(',', '.'));
 
-        var greenIcon = Leaflet.icon({
-          iconUrl: this.getIcon(diesel),
-          iconSize: [50, 50], // size of the icon
+        if (this.mediumPrice > diesel && diesel >= this.lowerPrice) {
+          return el;
+        }
+      });
+
+      return nearStations;
+    } else return nearStations;
+  }
+
+  loadStations(lat1, lng1) {
+    this.getNearStations(lat1, lng1).forEach((el, index) => {
+      let diesel = parseFloat(el.diesel.replace(',', '.'));
+
+      var greenIcon = Leaflet.icon({
+        iconUrl: this.getIcon(diesel),
+        iconSize: [50, 50], // size of the icon
+      });
+
+      let mark = Leaflet.marker([el.lat, el.lng], {
+        icon: greenIcon,
+        title: index,
+      })
+        .addTo(this.map)
+        .bindTooltip(el.diesel + '€', { permanent: true, direction: 'top' })
+        .addEventListener('click', (station) => {
+          console.log('gas', el);
+          this.stationSelected = el;
+          this.setOpen(true);
         });
 
-
-        let mark = Leaflet.marker([el.lat, el.lng], {
-          icon: greenIcon,
-          title: index,
-        })
-          .addTo(this.map)
-          .bindTooltip(el.diesel + '€', { permanent: true, direction: 'top' }).addEventListener('click', (station) => {
-            console.log('gas',el)
-            this.stationSelected = el
-            this.setOpen(true)
-          });
-
-        this.markers.push(mark);
+      this.markers.push(mark);
     });
   }
 
@@ -228,10 +265,9 @@ export class HomePage {
     return '../../assets/markers/pin-medium.png';
   }
 
-
-  openModalCheaper(){
-    this.stationSelected = this.gasMasBarata
-    this.setOpen(true)
+  openModalCheaper() {
+    this.stationSelected = this.gasMasBarata;
+    this.setOpen(true);
   }
 
   removeMarks() {
@@ -244,5 +280,58 @@ export class HomePage {
     this.removeMarks();
     this.loadStations(this.coords.latitude, this.coords.longitude);
     this.map.flyTo([this.coords.latitude, this.coords.longitude]);
+  }
+
+  showAll() {
+    this.labelSegment = 'all';
+    this.showCheapers = false;
+    this.removeMarks();
+    this.loadStations(
+      this.coordsChanged ? this.coordsChanged.lat : this.coords.latitude,
+      this.coordsChanged ? this.coordsChanged.lng : this.coords.longitude
+    );
+  }
+
+  showCheaper() {
+    this.labelSegment = 'cheap';
+    this.showCheapers = true;
+    this.removeMarks();
+    this.loadStations(
+      this.coordsChanged ? this.coordsChanged.lat : this.coords.latitude,
+      this.coordsChanged ? this.coordsChanged.lng : this.coords.longitude
+    );
+  }
+
+  async showBanner() {
+
+    AdMob.initialize({
+      requestTrackingAuthorization: true,
+    });
+
+    const idAndroid = 'ca-app-pub-7253910914294252/4651282874';
+
+    const options: BannerAdOptions = {
+      adId: idAndroid,
+      adSize: BannerAdSize.ADAPTIVE_BANNER,
+      position: BannerAdPosition.TOP_CENTER,
+      margin: 0,
+    };
+
+    await AdMob.showBanner(options);
+  }
+
+
+  async showError(error) {
+    const toast = await this.toastController.create({
+      message: error,
+      duration: 2000,
+      position: 'bottom'
+    });
+
+    await toast.present();
+  }
+
+  toogleFilters(){
+    this.showFilters = !this.showFilters
   }
 }
